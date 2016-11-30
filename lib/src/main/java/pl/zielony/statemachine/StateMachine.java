@@ -14,7 +14,7 @@ public class StateMachine {
 
     private int state = STATE_NEW;
 
-    private SparseArray<SparseArray<EdgeListener>> edges = new SparseArray<>();
+    private SparseArray<SparseArray<Edge>> edges = new SparseArray<>();
     private OnStateChangeListener stateListener;
 
     public void save(Bundle bundle) {
@@ -33,24 +33,27 @@ public class StateMachine {
     }
 
     private void setStateInternal(int newState) {
-        EdgeListener listener = edges.get(state).get(newState);
+        Edge edge = edges.get(state).get(newState);
         state = newState;
-        listener.onStateChanged();
+        Edge.OnStateChangedListener listener = edge.onStateChangedListener;
+        if (listener != null)
+            listener.onStateChanged();
         if (stateListener != null)
             stateListener.onStateChange(state);
     }
 
-    public void resetState() {
+    public void reset() {
         state = STATE_NEW;
     }
 
-    public void addEdge(int stateFrom, int stateTo, EdgeListener listener) {
+    public void addEdge(int stateFrom, int stateTo, Edge.OnTryChangeListener listener, Edge.OnStateChangedListener listener2) {
+        Edge edge = new Edge(listener, listener2);
         if (edges.indexOfKey(stateFrom) < 0) {
-            SparseArray<EdgeListener> list = new SparseArray<>();
-            list.put(stateTo, listener);
+            SparseArray<Edge> list = new SparseArray<>();
+            list.put(stateTo, edge);
             edges.put(stateFrom, list);
         } else {
-            edges.get(stateFrom).put(stateTo, listener);
+            edges.get(stateFrom).put(stateTo, edge);
         }
     }
 
@@ -71,10 +74,13 @@ public class StateMachine {
     }
 
     private boolean updateInternal() {
-        SparseArray<EdgeListener> listeners = edges.get(state);
+        SparseArray<Edge> listeners = edges.get(state);
         for (int i = 0; i < listeners.size(); i++) {
             int newState = listeners.keyAt(i);
-            if (listeners.get(newState).canChangeState()) {
+            Edge.OnTryChangeListener onTryChangeListener = listeners.get(newState).onTryChangeListener;
+            if (onTryChangeListener == null)
+                return false;
+            if (onTryChangeListener.onTryChange()) {
                 setStateInternal(newState);
                 return true;
             }
