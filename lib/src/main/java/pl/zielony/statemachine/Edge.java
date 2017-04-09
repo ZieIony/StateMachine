@@ -3,20 +3,12 @@ package pl.zielony.statemachine;
 /**
  * Created by Marcin on 2016-11-25.
  */
-public class Edge {
-    public interface OnTryChangeListener {
-
-        boolean onTryChange();
-    }
-
-    public interface OnStateChangedListener {
-        void onStateChanged();
-    }
+class Edge {
 
     OnTryChangeListener onTryChangeListener;
-    OnStateChangedListener onStateChangedListener;
+    OnStateChangeListener onStateChangedListener;
 
-    Edge(OnTryChangeListener onTryChangeListener, OnStateChangedListener onStateChangedListener) {
+    Edge(OnTryChangeListener onTryChangeListener, OnStateChangeListener onStateChangedListener) {
         this.onTryChangeListener = onTryChangeListener;
         this.onStateChangedListener = onStateChangedListener;
     }
