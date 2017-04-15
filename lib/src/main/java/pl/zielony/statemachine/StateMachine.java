@@ -1,49 +1,56 @@
 package pl.zielony.statemachine;
 
 import android.os.Bundle;
-import android.util.SparseArray;
+
+import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by Marcin on 2016-07-30.
  */
 
-public class StateMachine {
+public class StateMachine<Type extends Serializable> {
     private static final String STATE = "state";
 
-    public static final int STATE_NEW = 0;
+    private final Type initialState;
+    private Type state;
 
-    private int state = STATE_NEW;
+    private Map<Type, Map<Type, Edge>> edges = new HashMap<>();
+    private Map<Type, OnMachineStateChangedListener> states = new HashMap<>();
+    private OnMachineStateChangedListener globalStateListener;
 
-    private SparseArray<SparseArray<Edge>> edges = new SparseArray<>();
-    private SparseArray<OnStateChangedListener> states = new SparseArray<>();
-    private OnStateChangedListener globalStateListener;
+    public StateMachine(Type initialState) {
+        this.initialState = initialState;
+        state = initialState;
+    }
 
     public void save(Bundle bundle) {
-        bundle.putInt(STATE, state);
+        bundle.putSerializable(STATE, state);
     }
 
     public void restore(Bundle bundle) {
-        state = bundle.getInt(STATE);
+        state = (Type) bundle.getSerializable(STATE);
     }
 
-    public void setState(int newState) {
+    public void setState(Type newState) {
         setState(newState, null);
     }
 
-    public <Type> void setState(int newState, Type param) {
+    public <ParamType> void setState(Type newState, ParamType param) {
         if (!hasEdge(state, newState))
-            throw new IllegalStateException("cannot change state from " + state + " to state " + newState);
+            throw new IllegalStateException("cannot change state from " + state + " to " + newState);
         setStateInternal(newState, param);
         update();
     }
 
-    private <Type> void setStateInternal(int newState, Type param) {
+    private <ParamType> void setStateInternal(Type newState, ParamType param) {
         Edge edge = edges.get(state).get(newState);
-        OnStateChangeListener listener = edge.onStateChangedListener;
-        if (listener != null)
-            listener.onStateChange(param);
         state = newState;
-        OnStateChangedListener stateListener = states.get(newState);
+        OnStateChangedListener listener = edge.onStateChangedListener;
+        if (listener != null)
+            listener.onStateChanged(param);
+        OnMachineStateChangedListener stateListener = states.get(newState);
         if (stateListener != null)
             stateListener.onStateChanged(state);
         if (globalStateListener != null)
@@ -51,27 +58,25 @@ public class StateMachine {
     }
 
     public void reset() {
-        state = STATE_NEW;
+        state = initialState;
     }
 
-    public void addEdge(int stateFrom, int stateTo) {
+    public void addEdge(Type stateFrom, Type stateTo) {
         addEdge(stateFrom, stateTo, null, null);
     }
 
-    public void addEdge(int stateFrom, int stateTo, OnStateChangeListener listener2) {
+    public void addEdge(Type stateFrom, Type stateTo, OnStateChangedListener listener2) {
         addEdge(stateFrom, stateTo, null, listener2);
     }
 
-    public void addEdge(int stateFrom, int stateTo, OnTryChangeListener listener) {
+    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener listener) {
         addEdge(stateFrom, stateTo, listener, null);
     }
 
-    public void addEdge(int stateFrom, int stateTo, OnTryChangeListener listener, OnStateChangeListener listener2) {
-        if (stateFrom == STATE_NEW && edges.indexOfKey(stateFrom) >= 0)
-            throw new IllegalStateException("There can be only one entry point");
+    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener listener, OnStateChangedListener listener2) {
         Edge edge = new Edge(listener, listener2);
-        if (edges.indexOfKey(stateFrom) < 0) {
-            SparseArray<Edge> list = new SparseArray<>();
+        if (!edges.containsKey(stateFrom)) {
+            Map<Type, Edge> list = new HashMap<>();
             list.put(stateTo, edge);
             edges.put(stateFrom, list);
         } else if (edges.get(stateFrom).get(stateTo) != null) {
@@ -81,21 +86,21 @@ public class StateMachine {
         }
     }
 
-    public void addState(int state, OnStateChangedListener listener) {
-        if (states.indexOfKey(state) >= 0)
+    public void addState(Type state, OnMachineStateChangedListener listener) {
+        if (states.containsKey(state))
             throw new IllegalStateException("There's already state " + state);
         states.put(state, listener);
     }
 
-    public boolean hasEdge(int stateFrom, int stateTo) {
-        return edges.indexOfKey(stateFrom) >= 0 && edges.get(stateFrom).indexOfKey(stateTo) >= 0;
+    public boolean hasEdge(Type stateFrom, Type stateTo) {
+        return edges.containsKey(stateFrom) && edges.get(stateFrom).containsKey(stateTo);
     }
 
-    public int getState() {
+    public Type getState() {
         return state;
     }
 
-    public void setOnStateChangeListener(OnStateChangedListener stateListener) {
+    public void setOnStateChangeListener(OnMachineStateChangedListener stateListener) {
         this.globalStateListener = stateListener;
     }
 
@@ -104,15 +109,15 @@ public class StateMachine {
     }
 
     private boolean updateInternal() {
-        SparseArray<Edge> listeners = edges.get(state);
+        Map<Type, Edge> listeners = edges.get(state);
         if (listeners == null)
             return false;
-        for (int i = 0; i < listeners.size(); i++) {
-            int newState = listeners.keyAt(i);
-            OnTryChangeListener onTryChangeListener = listeners.get(newState).onTryChangeListener;
+        for (Map.Entry<Type, Edge> e : listeners.entrySet()) {
+            OnTryChangeListener onTryChangeListener = e.getValue().onTryChangeListener;
             if (onTryChangeListener == null)
                 return false;
             if (onTryChangeListener.onTryChange()) {
+                Type newState = e.getKey();
                 setStateInternal(newState, null);
                 return true;
             }

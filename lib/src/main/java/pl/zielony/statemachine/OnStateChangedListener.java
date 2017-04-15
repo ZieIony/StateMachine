@@ -1,7 +1,7 @@
 package pl.zielony.statemachine;
 
 /**
- * Created by Marcin on 2017-04-09.
+ * Created by Marcin on 2016-07-30.
  */
 public interface OnStateChangedListener {
     void onStateChanged(Object param);
