@@ -2,13 +2,11 @@ package pl.zielony.statemachine;
 
 import android.os.Bundle;
 
+import com.annimon.stream.Stream;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-
-/**
- * Created by Marcin on 2016-07-30.
- */
 
 public class StateMachine<Type extends Serializable> {
     private static final String STATE = "state";
@@ -17,8 +15,8 @@ public class StateMachine<Type extends Serializable> {
     private Type state;
 
     private Map<Type, Map<Type, Edge>> edges = new HashMap<>();
-    private Map<Type, OnMachineStateChangedListener> states = new HashMap<>();
-    private OnMachineStateChangedListener globalStateListener;
+    private Map<Type, OnStateChangedListener> states = new HashMap<>();
+    private OnStateChangedListener globalStateListener;
 
     public StateMachine(Type initialState) {
         this.initialState = initialState;
@@ -39,7 +37,7 @@ public class StateMachine<Type extends Serializable> {
 
     public <ParamType> void setState(Type newState, ParamType param) {
         if (!hasEdge(state, newState))
-            throw new IllegalStateException("cannot change state from " + state + " to " + newState);
+            throw new IllegalStateException("Cannot change state from " + state + " to " + newState);
         setStateInternal(newState, param);
         update();
     }
@@ -50,11 +48,11 @@ public class StateMachine<Type extends Serializable> {
         OnStateChangedListener listener = edge.onStateChangedListener;
         if (listener != null)
             listener.onStateChanged(param);
-        OnMachineStateChangedListener stateListener = states.get(newState);
+        OnStateChangedListener stateListener = states.get(newState);
         if (stateListener != null)
-            stateListener.onStateChanged(state);
+            stateListener.onStateChanged(param);
         if (globalStateListener != null)
-            globalStateListener.onStateChanged(state);
+            globalStateListener.onStateChanged(param);
     }
 
     public void reset() {
@@ -65,30 +63,40 @@ public class StateMachine<Type extends Serializable> {
         addEdge(stateFrom, stateTo, null, null);
     }
 
-    public void addEdge(Type stateFrom, Type stateTo, OnStateChangedListener listener2) {
-        addEdge(stateFrom, stateTo, null, listener2);
+    public void addEdge(Type stateFrom, Type stateTo, OnStateChangedListener changeListener) {
+        addEdge(stateFrom, stateTo, null, changeListener);
     }
 
-    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener listener) {
-        addEdge(stateFrom, stateTo, listener, null);
+    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener tryListener) {
+        addEdge(stateFrom, stateTo, tryListener, null);
     }
 
-    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener listener, OnStateChangedListener listener2) {
-        Edge edge = new Edge(listener, listener2);
+    public void addEdge(Type stateFrom, Type stateTo, OnTryChangeListener tryListener, OnStateChangedListener changeListener) {
+        if (stateFrom == stateTo)
+            throw new IllegalArgumentException("Both states have the same value: '" + stateFrom + "'");
+        Edge edge = new Edge(tryListener, changeListener);
         if (!edges.containsKey(stateFrom)) {
             Map<Type, Edge> list = new HashMap<>();
             list.put(stateTo, edge);
             edges.put(stateFrom, list);
         } else if (edges.get(stateFrom).get(stateTo) != null) {
-            throw new IllegalStateException("There's already an edge from state " + stateFrom + " to " + stateTo);
+            throw new IllegalStateException("There's already an edge from state '" + stateFrom + "' to '" + stateTo + "'");
         } else {
+            boolean hasEmptyTryListeners = Stream.of(edges.get(stateFrom).values()).anyMatch(e -> e.onTryChangeListener == null);
+            if (hasEmptyTryListeners || tryListener == null)
+                throw new IllegalStateException("Nondeterministic state change from '" + stateFrom + "'");
             edges.get(stateFrom).put(stateTo, edge);
         }
     }
 
+    @Deprecated
     public void addState(Type state, OnMachineStateChangedListener listener) {
+        addStateListener(state, listener::onStateChanged);
+    }
+
+    public void addStateListener(Type state, OnStateChangedListener listener) {
         if (states.containsKey(state))
-            throw new IllegalStateException("There's already state " + state);
+            throw new IllegalStateException("There's already a state '" + state + "'");
         states.put(state, listener);
     }
 
@@ -100,7 +108,12 @@ public class StateMachine<Type extends Serializable> {
         return state;
     }
 
+    @Deprecated
     public void setOnStateChangeListener(OnMachineStateChangedListener stateListener) {
+        setOnStateChangedListener(stateListener::onStateChanged);
+    }
+
+    public void setOnStateChangedListener(OnStateChangedListener stateListener) {
         this.globalStateListener = stateListener;
     }
 

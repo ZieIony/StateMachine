@@ -1,8 +1,6 @@
 package pl.zielony.statemachine;
 
-/**
- * Created by Marcin on 2017-04-09.
- */
+@Deprecated
 public interface OnMachineStateChangedListener {
     void onStateChanged(Object param);
 }
