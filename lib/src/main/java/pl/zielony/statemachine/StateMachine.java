@@ -29,6 +29,11 @@ public class StateMachine<Type extends Serializable> {
 
     public void restore(Bundle bundle) {
         state = (Type) bundle.getSerializable(STATE);
+        OnStateChangedListener stateListener = states.get(state);
+        if (stateListener != null)
+            stateListener.onStateChanged(null);
+        if (globalStateListener != null)
+            globalStateListener.onStateChanged(null);
     }
 
     public void setState(Type newState) {
