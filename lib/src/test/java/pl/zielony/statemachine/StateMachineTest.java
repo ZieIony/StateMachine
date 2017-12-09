@@ -38,10 +38,23 @@ public class StateMachineTest extends TestCase {
 
     public void testAddEdge() throws Exception {
         try {
-            // there's already an edge from 1 to 3, so this
-            stateMachine.addEdge(TestState.STATE1, TestState.STATE3);
+            // there's already a nonconditional edge from 1 to 3
+            stateMachine.addEdge(TestState.STATE1, TestState.STATE3, () -> true);
             fail();
         } catch (IllegalStateException e) {
+        }
+        try {
+            // this is ok, two edges from 1, both nonconditional
+            stateMachine.addEdge(TestState.STATE1, TestState.STATE3);
+        } catch (IllegalStateException e) {
+            fail();
+        }
+        try {
+            // this is also ok, two edges from 3, both conditional
+            stateMachine.addEdge(TestState.STATE3, TestState.STATE2, () -> true);
+            stateMachine.addEdge(TestState.STATE3, TestState.STATE1, () -> false);
+        } catch (IllegalStateException e) {
+            fail();
         }
         try {
             // edge's ends cannot have the same value

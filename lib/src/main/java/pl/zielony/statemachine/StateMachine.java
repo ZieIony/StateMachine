@@ -82,8 +82,8 @@ public class StateMachine<Type extends Serializable> {
         } else if (edges.get(stateFrom).get(stateTo) != null) {
             throw new IllegalStateException("There's already an edge from state '" + stateFrom + "' to '" + stateTo + "'");
         } else {
-            boolean hasEmptyTryListeners = Stream.of(edges.get(stateFrom).values()).anyMatch(e -> e.onTryChangeListener == null);
-            if (hasEmptyTryListeners || tryListener == null)
+            long emptyListeners = Stream.of(edges.get(stateFrom).values()).filter(e -> e.onTryChangeListener == null).count();
+            if (emptyListeners < edges.get(stateFrom).size() && tryListener == null || emptyListeners > 0 && tryListener != null)
                 throw new IllegalStateException("Nondeterministic state change from '" + stateFrom + "'");
             edges.get(stateFrom).put(stateTo, edge);
         }
